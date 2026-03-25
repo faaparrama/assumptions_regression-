@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Regression Assumptions · Interactive Demo</title>
+    <meta name="description"
+        content="Interactive regression assumptions playground for intermediate statistics students. Explore linearity, homoscedasticity, normality, outliers, and autocorrelation.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', Roboto, system-ui, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f0eb 0%, #e8ddd4 100%);
+            margin: 0;
+            min-height: 100vh;
+            padding: 20px 16px;
+        }
+
+        /* ── Header bar (full width) ── */
+        .top-bar {
+            max-width: 1600px;
+            margin: 0 auto 16px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+
+        h1 {
+            font-weight: 700;
+            font-size: 1.6rem;
+            margin: 0;
+            color: #660000;
+            letter-spacing: -0.03em;
+        }
+
+        .badge {
+            background: linear-gradient(135deg, #660000, #8b1a1a);
+            color: white;
+            padding: 5px 14px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .sub {
+            color: #5a4a3a;
+            font-size: 0.9rem;
+            border-left: 4px solid #660000;
+            padding: 8px 16px;
+            background: linear-gradient(90deg, #faf5f0, transparent);
+            border-radius: 0 12px 12px 0;
+            line-height: 1.5;
+            margin-bottom: 0;
+        }
+
+        /* ── Main two-column layout ── */
+        .main-layout {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+        }
+
+        /* Left: charts + stats */
+        .charts-area {
+            flex: 1 1 0;
+            min-width: 0;
+        }
+
+        /* Right: sliders sidebar */
+        .sidebar {
+            width: 340px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 16px;
+            max-height: calc(100vh - 32px);
+            overflow-y: auto;
+            background: white;
+            border-radius: 22px;
+            box-shadow: 0 16px 48px -12px rgba(102, 0, 0, 0.12), 0 0 0 1px rgba(102, 0, 0, 0.04);
+            padding: 18px 16px 16px;
+        }
+
+        /* Scrollbar styling for sidebar */
+        .sidebar::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #d4c4b4;
+            border-radius: 10px;
+        }
+
+        /* ── Stats bar ── */
+        .stats-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .stat-chip {
+            flex: 1 1 160px;
+            background: white;
+            border: 1px solid #e8ddd4;
+            border-radius: 14px;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        .stat-chip .label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #8b6914;
+        }
+
+        .stat-chip .value {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #660000;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        /* ── Health dashboard ── */
+        .health-dashboard {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .health-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 12px;
+            border: 1px solid #e8ddd4;
+            background: #faf8f5;
+            transition: all 0.3s ease;
+            flex: 1 1 auto;
+        }
+
+        .health-item.good {
+            border-color: #86efac;
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+        }
+
+        .health-item.warn {
+            border-color: #fbbf24;
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            animation: pulse-warn 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-warn {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+            }
+
+            50% {
+                box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.15);
+            }
+        }
+
+        .health-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .health-item.good .health-dot {
+            background: #22c55e;
+        }
+
+        .health-item.warn .health-dot {
+            background: #f59e0b;
+        }
+
+        .health-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #3a2a1a;
+            line-height: 1.2;
+        }
+
+        .health-status {
+            font-size: 0.75rem;
+            color: #6b5b4b;
+            font-weight: 400;
+        }
+
+        /* ── Chart panels ── */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .chart-box {
+            background: white;
+            border-radius: 18px;
+            padding: 14px 14px 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            border: 1px solid #eee5dc;
+        }
+
+        .chart-box h3 {
+            margin: 0 0 8px;
+            font-weight: 600;
+            color: #3a2a1a;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.88rem;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+            max-height: 240px;
+            background: #fefcfa;
+            border-radius: 10px;
+        }
+
+        /* ── Preset buttons ── */
+        .presets-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+
+        .presets-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #5a4a3a;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            width: 100%;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .preset-btn {
+            background: #faf5f0;
+            border: 1px solid #e8ddd4;
+            padding: 5px 11px;
+            border-radius: 30px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: #5a4a3a;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            background: #660000;
+            color: white;
+            border-color: #660000;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(102, 0, 0, 0.2);
+        }
+
+        .preset-btn.active {
+            background: #660000;
+            color: white;
+            border-color: #660000;
+        }
+
+        /* ── Seed lock ── */
+        .seed-lock {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .seed-lock-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: #faf5f0;
+            border: 1px solid #e8ddd4;
+            padding: 5px 12px;
+            border-radius: 30px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: #5a4a3a;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .seed-lock-btn.locked {
+            background: #660000;
+            color: white;
+            border-color: #660000;
+        }
+
+        .seed-lock-hint {
+            font-size: 0.68rem;
+            color: #8b7b6b;
+        }
+
+        /* ── Slider controls ── */
+        .sidebar-section-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #8b7b6b;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .slider-group {
+            background: #faf5f0;
+            border-radius: 14px;
+            padding: 10px 12px 8px;
+            margin-bottom: 8px;
+            border: 1px solid #eee5dc;
+            transition: box-shadow 0.2s;
+        }
+
+        .slider-group:hover {
+            box-shadow: 0 3px 12px rgba(102, 0, 0, 0.06);
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .slider-label {
+            font-weight: 600;
+            color: #3a2a1a;
+            font-size: 0.78rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .slider-value {
+            background: linear-gradient(135deg, #660000, #8b1a1a);
+            padding: 2px 8px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            color: white;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            min-width: 38px;
+            text-align: center;
+        }
+
+        .info-btn {
+            background: none;
+            border: 1px solid #d4c4b4;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            font-size: 0.6rem;
+            color: #8b7b6b;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .info-btn:hover {
+            background: #660000;
+            color: white;
+            border-color: #660000;
+        }
+
+        .info-panel {
+            display: none;
+            background: white;
+            border: 1px solid #e8ddd4;
+            border-radius: 10px;
+            padding: 8px 10px;
+            margin-top: 6px;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            color: #5a4a3a;
+            animation: fadeIn 0.25s ease;
+        }
+
+        .info-panel.open {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-3px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        input[type=range] {
+            width: 100%;
+            margin: 2px 0;
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #e8ddd4, #d4c4b4);
+            border-radius: 10px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            background: linear-gradient(135deg, #660000, #8b1a1a);
+            border-radius: 50%;
+            margin-top: -7px;
+            cursor: grab;
+            border: 2.5px solid white;
+            box-shadow: 0 2px 6px rgba(102, 0, 0, 0.3);
+            transition: transform 0.15s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        input[type=range]::-moz-range-track {
+            height: 4px;
+            background: linear-gradient(90deg, #e8ddd4, #d4c4b4);
+            border-radius: 10px;
+            border: none;
+        }
+
+        input[type=range]::-moz-range-thumb {
+            height: 18px;
+            width: 18px;
+            background: linear-gradient(135deg, #660000, #8b1a1a);
+            border-radius: 50%;
+            cursor: grab;
+            border: 2.5px solid white;
+            box-shadow: 0 2px 6px rgba(102, 0, 0, 0.3);
+        }
+
+        .value-hint {
+            font-size: 0.75rem;
+            color: #8b7b6b;
+            margin-top: 1px;
+            text-align: right;
+        }
+
+        /* ── Footer ── */
+        .footer-note {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #5a4a3a;
+            font-size: 0.82rem;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .reset-btn {
+            background: white;
+            border: 2px solid #660000;
+            padding: 7px 20px;
+            border-radius: 40px;
+            font-weight: 600;
+            color: #660000;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.82rem;
+        }
+
+        .reset-btn:hover {
+            background: #660000;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 0, 0, 0.25);
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px dashed #e8ddd4;
+            margin: 10px 0;
+        }
+
+        /* ── Intro box ── */
+        details.intro-box {
+            margin-top: 12px;
+            border: 1px solid #e8ddd4;
+            border-radius: 14px;
+            background: white;
+            overflow: hidden;
+        }
+
+        details.intro-box summary.intro-toggle {
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #5a4a3a;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+        }
+
+        details.intro-box summary.intro-toggle:hover {
+            background: #faf5f0;
+        }
+
+        details.intro-box summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.intro-box[open] summary.intro-toggle::after {
+            content: ' ▲';
+            font-size: 0.7rem;
+            color: #8b7b6b;
+            margin-left: auto;
+        }
+
+        details.intro-box:not([open]) summary.intro-toggle::after {
+            content: ' ▼';
+            font-size: 0.7rem;
+            color: #8b7b6b;
+            margin-left: auto;
+        }
+
+        .intro-content {
+            padding: 4px 16px 14px;
+            font-size: 0.82rem;
+            color: #5a4a3a;
+            line-height: 1.6;
+        }
+
+        .line-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .line-card {
+            background: #faf5f0;
+            border: 1px solid #e8ddd4;
+            border-radius: 10px;
+            padding: 8px 12px;
+        }
+
+        .line-letter {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #660000;
+            line-height: 1;
+        }
+
+        .line-name {
+            font-weight: 600;
+            font-size: 0.82rem;
+            color: #3a2a1a;
+            margin-top: 2px;
+        }
+
+        .line-desc {
+            font-size: 0.78rem;
+            color: #6b5b4b;
+            margin-top: 3px;
+            line-height: 1.4;
+        }
+
+        /* ── Chart hints ── */
+        .chart-hint {
+            font-size: 0.75rem;
+            color: #7b6b5b;
+            margin: -2px 0 6px;
+            font-style: italic;
+            line-height: 1.35;
+        }
+
+        /* ── Insight panel ── */
+        .insight-panel {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border: 1px solid #fbbf24;
+            border-radius: 14px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            display: none;
+            font-size: 0.82rem;
+            color: #3a2a1a;
+            line-height: 1.5;
+        }
+
+        .insight-panel.visible {
+            display: block;
+        }
+
+        .insight-panel > .insight-title {
+            font-weight: 700;
+            color: #92400e;
+            margin-bottom: 6px;
+        }
+
+        .insight-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 5px 0;
+            border-top: 1px dashed #fde68a;
+            font-size: 0.8rem;
+        }
+
+        .insight-row .insight-name {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 1024px) {
+            .main-layout {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                position: static;
+                max-height: none;
+                overflow-y: visible;
+            }
+
+            .chart-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.3rem;
+            }
+
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .health-dashboard {
+                flex-direction: column;
+            }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+</head>
+
+<body>
+    <!-- ── Full-width header ── -->
+    <div class="top-bar">
+        <div class="header">
+            <h1>Regression Checkup</h1>
+            <h2>Developed by: Andy Parra-Martinez, PhD</h2>
+            <span class="badge">Assumptions Playground</span>
+        </div>
+        <div class="sub">Move the sliders — watch how the regression line &amp; residuals react. Toggle violations on and
+            off to build intuition about OLS assumptions. <strong>Tip:</strong> Focus on <em>residual patterns</em> — their shape tells you whether the model is trustworthy.</div>
+        <details class="intro-box">
+            <summary class="intro-toggle">📚 What are the regression assumptions? (LINE — click to expand)</summary>
+            <div class="intro-content">
+                <p style="margin:0 0 6px">OLS regression relies on four key assumptions, remembered as <strong>LINE</strong>. Violating them doesn't always break your model, but it affects which conclusions you can trust.</p>
+                <div class="line-grid">
+                    <div class="line-card">
+                        <div class="line-letter">L</div>
+                        <div class="line-name">Linearity</div>
+                        <div class="line-desc">The mean of Y changes linearly with X. A curved residual pattern means you're fitting a line to a curve.</div>
+                    </div>
+                    <div class="line-card">
+                        <div class="line-letter">I</div>
+                        <div class="line-name">Independence</div>
+                        <div class="line-desc">Errors are not correlated with each other. Most critical for time-ordered or grouped data.</div>
+                    </div>
+                    <div class="line-card">
+                        <div class="line-letter">N</div>
+                        <div class="line-name">Normality</div>
+                        <div class="line-desc">Residuals are approximately normally distributed. Needed for valid p-values and CIs, especially with small samples.</div>
+                    </div>
+                    <div class="line-card">
+                        <div class="line-letter">E</div>
+                        <div class="line-name">Equal Variance</div>
+                        <div class="line-desc">Variance of residuals is constant across all fitted values (homoscedasticity). A funnel shape violates this.</div>
+                    </div>
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <!-- ── Two-column layout: charts left, sliders right ── -->
+    <div class="main-layout">
+        <!-- LEFT: Charts & stats -->
+        <div class="charts-area">
+            <!-- Stats bar -->
+            <div class="stats-bar">
+                <div class="stat-chip">
+                    <span class="label">OLS Equation</span>
+                    <span class="value" id="eqDisplay">Ŷ = 0.00 + 0.50·X</span>
+                </div>
+                <div class="stat-chip">
+                    <span class="label">R²</span>
+                    <span class="value" id="r2Display">0.000</span>
+                </div>
+                <div class="stat-chip">
+                    <span class="label">Adj. R²</span>
+                    <span class="value" id="adjR2Display">0.000</span>
+                </div>
+                <div class="stat-chip">
+                    <span class="label">Residual Std. Error</span>
+                    <span class="value" id="rseDisplay">0.000</span>
+                </div>
+            </div>
+
+            <!-- Health dashboard -->
+            <div class="health-dashboard" id="healthDash">
+                <div class="health-item good" id="h-linearity">
+                    <div class="health-dot"></div>
+                    <div>
+                        <div class="health-label">Linearity</div>
+                        <div class="health-status">✅ Good</div>
+                    </div>
+                </div>
+                <div class="health-item good" id="h-homosced">
+                    <div class="health-dot"></div>
+                    <div>
+                        <div class="health-label">Homoscedasticity</div>
+                        <div class="health-status">✅ Good</div>
+                    </div>
+                </div>
+                <div class="health-item good" id="h-normality">
+                    <div class="health-dot"></div>
+                    <div>
+                        <div class="health-label">Normality</div>
+                        <div class="health-status">✅ Good</div>
+                    </div>
+                </div>
+                <div class="health-item good" id="h-outlier">
+                    <div class="health-dot"></div>
+                    <div>
+                        <div class="health-label">No Outliers</div>
+                        <div class="health-status">✅ Good</div>
+                    </div>
+                </div>
+                <div class="health-item good" id="h-independence">
+                    <div class="health-dot"></div>
+                    <div>
+                        <div class="health-label">Independence</div>
+                        <div class="health-status">✅ Good</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insight panel: shown when violations are active -->
+            <div class="insight-panel" id="insightPanel"></div>
+
+            <!-- 4 charts in 2×2 grid -->
+            <div class="chart-grid">
+                <div class="chart-box">
+                    <h3>📈 <span id="scatterTitle">Data + Regression Line</span></h3>
+                    <div class="chart-hint" id="scatterHint">Look for: points scattered evenly around the line with no obvious curve</div>
+                    <div id="scatterSubtitle"
+                        style="font-size:0.68rem; color:#8b7b6b; margin:-4px 0 6px; display:none;">When p > 1, shows Y
+                        vs Ŷ (actual vs predicted)</div>
+                    <canvas id="scatterChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h3>📉 Residuals vs Fitted</h3>
+                    <div class="chart-hint">Look for: random scatter around zero — no curves (linearity), no funnel (equal variance)</div>
+                    <canvas id="residChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h3>📊 Q-Q Plot (Normality)</h3>
+                    <div class="chart-hint">Look for: points hugging the diagonal — curves or heavy tails signal non-normality</div>
+                    <canvas id="qqChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h3>🔗 Residuals vs Order</h3>
+                    <div class="chart-hint">Look for: random scatter — runs of same-sign residuals suggest autocorrelation. Most relevant for time-series data.</div>
+                    <canvas id="orderChart"></canvas>
+                </div>
+            </div>
+
+            <div class="footer-note">
+                <span>👀 Focus on <strong>residual patterns</strong>, not just p-values — shape tells you if the line is
+                    trustworthy.</span>
+                <button class="reset-btn" id="resetBtn">⟲ Reset to Healthy</button>
+            </div>
+        </div>
+
+        <!-- RIGHT: Controls sidebar -->
+        <div class="sidebar">
+            <!-- Presets -->
+            <div class="presets-bar">
+                <span class="presets-label">⚡ Presets</span>
+                <button class="preset-btn active" data-preset="healthy">✅ Healthy</button>
+                <button class="preset-btn" data-preset="megaphone">📢 Megaphone</button>
+                <button class="preset-btn" data-preset="curved">🌙 Curved</button>
+                <button class="preset-btn" data-preset="outlier">💥 Outlier</button>
+                <button class="preset-btn" data-preset="autocorr">🔗 Autocorr.</button>
+                <button class="preset-btn" data-preset="chaos">🔥 Chaos</button>
+            </div>
+
+            <!-- Seed lock -->
+            <div class="seed-lock">
+                <button class="seed-lock-btn" id="seedLockBtn">🔓 Seed unlocked</button>
+                <span class="seed-lock-hint">Freeze the random sample so only your slider changes</span>
+            </div>
+
+            <hr class="divider">
+            <div class="sidebar-section-title">🎛️ Model Parameters</div>
+
+            <!-- number of predictors -->
+            <div class="slider-group" style="border-left: 3px solid #7c3aed;">
+                <div class="slider-header">
+                    <span class="slider-label">📊 Predictors (p) <button class="info-btn"
+                            data-info="info-pred">i</button></span>
+                    <span class="slider-value" id="predVal"
+                        style="background:linear-gradient(135deg,#7c3aed,#9333ea);">1</span>
+                </div>
+                <input type="range" id="predSlider" min="1" max="4" value="1" step="1">
+                <div class="value-hint">1 = simple, 2–4 = multiple regression</div>
+                <div class="info-panel" id="info-pred">
+                    <strong>Multiple regression:</strong> Adding predictors shows how R² grows (sometimes spuriously).
+                    The Adj. R² penalizes for extra variables. Notice: residual diagnostics remain the <em>same</em>
+                    regardless of how many predictors you use — that's the key insight!
+                </div>
+            </div>
+
+            <!-- sample size -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-label">🧑‍🤝‍🧑 Sample Size <button class="info-btn"
+                            data-info="info-n">i</button></span>
+                    <span class="slider-value" id="nVal">30</span>
+                </div>
+                <input type="range" id="nSlider" min="10" max="200" value="30" step="1">
+                <div class="value-hint">more points = clearer pattern</div>
+                <div class="info-panel" id="info-n">
+                    <strong>Why it matters:</strong> Larger samples make patterns more visible and give more reliable
+                    estimates. With small n, random noise can hide true relationships or create false ones.
+                </div>
+            </div>
+
+            <!-- intercept -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-label">📌 Intercept <button class="info-btn"
+                            data-info="info-int">i</button></span>
+                    <span class="slider-value" id="interceptVal">0.0</span>
+                </div>
+                <input type="range" id="interceptSlider" min="-5" max="5" value="0" step="0.1">
+                <div class="value-hint">where line crosses Y-axis</div>
+                <div class="info-panel" id="info-int">
+                    <strong>The intercept (b₀):</strong> The predicted Y when X = 0. Shifts the line up or down without
+                    affecting residual patterns.
+                </div>
+            </div>
+
+            <!-- slope -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-label">📐 Slope <button class="info-btn"
+                            data-info="info-slope">i</button></span>
+                    <span class="slider-value" id="slopeVal">0.50</span>
+                </div>
+                <input type="range" id="slopeSlider" min="-2" max="2" value="0.5" step="0.1">
+                <div class="value-hint">positive ↗ / negative ↘</div>
+                <div class="info-panel" id="info-slope">
+                    <strong>The slope (b₁):</strong> For each 1-unit increase in X, Y changes by b₁. Notice how R²
+                    increases with steeper slopes relative to noise.
+                </div>
+            </div>
+
+            <!-- noise -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-label">🌫️ Noise (SD) <button class="info-btn"
+                            data-info="info-noise">i</button></span>
+                    <span class="slider-value" id="errorVal">1.0</span>
+                </div>
+                <input type="range" id="errorSlider" min="0" max="5" value="1" step="0.1">
+                <div class="value-hint">scatter around the line</div>
+                <div class="info-panel" id="info-noise">
+                    <strong>Error variance (σ²):</strong> More noise = lower R², wider CIs, harder-to-detect effects.
+                    This is the irreducible error.
+                </div>
+            </div>
+
+            <hr class="divider">
+            <div class="sidebar-section-title">⚠️ Assumption Violations</div>
+
+            <!-- outlier -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-label">💥 Outlier <button class="info-btn"
+                            data-info="info-outlier">i</button></span>
+                    <span class="slider-value" id="outlierVal">0.0</span>
+                </div>
+                <input type="range" id="outlierSlider" min="-15" max="15" value="0" step="0.5">
+                <div class="value-hint">high-leverage point pushed up/down</div>
+                <div class="info-panel" id="info-outlier">
+                    <strong>High-leverage outlier:</strong> Places an extreme point at the highest X value — this is a <em>high-leverage</em> point, meaning it has outsized influence on the slope. Not all outliers are high-leverage (an extreme Y at average X pulls less). In practice, check Cook's Distance to measure how much each point shifts the regression line.
+                </div>
+            </div>
+
+            <!-- heteroscedasticity -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-label">🌀 Heteroscedasticity <button class="info-btn"
+                            data-info="info-hetero">i</button></span>
+                    <span class="slider-value" id="heteroVal">0.00</span>
+                </div>
+                <input type="range" id="heteroSlider" min="0" max="3" value="0" step="0.05">
+                <div class="value-hint">error grows with X (megaphone)</div>
+                <div class="info-panel" id="info-hetero">
+                    <strong>Constant variance violated.</strong> OLS assumes equal variance at all X levels. A
+                    "megaphone" in residuals means SEs are unreliable — use robust SE or WLS.
+                </div>
+            </div>
+
+            <!-- non-linearity -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-label">〰️ Non-Linearity <button class="info-btn"
+                            data-info="info-quad">i</button></span>
+                    <span class="slider-value" id="quadVal">0.00</span>
+                </div>
+                <input type="range" id="quadSlider" min="-0.3" max="0.3" value="0" step="0.01">
+                <div class="value-hint">bend (quadratic term)</div>
+                <div class="info-panel" id="info-quad">
+                    <strong>Linearity violated.</strong> A U-shaped residual pattern means you're fitting a line to
+                    curved data. Add polynomial terms or transform.
+                </div>
+            </div>
+
+            <!-- autocorrelation -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-label">🔗 Autocorrelation <button class="info-btn"
+                            data-info="info-auto">i</button></span>
+                    <span class="slider-value" id="autoVal">0.00</span>
+                </div>
+                <input type="range" id="autoSlider" min="0" max="0.95" value="0" step="0.05">
+                <div class="value-hint">errors correlated in sequence (AR1)</div>
+                <div class="info-panel" id="info-auto">
+                    <strong>Independence violated.</strong> This matters most when data are collected in sequence (time series, repeated measures). Look for "runs" of positive or negative residuals in the order plot. The Durbin-Watson test (range 0–4, ideal near 2) formally tests for AR(1) autocorrelation. Fix: use GLS, ARIMA, or cluster-robust standard errors.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            // ── Canvas contexts ──
+            const scatterCtx = document.getElementById('scatterChart').getContext('2d');
+            const residCtx = document.getElementById('residChart').getContext('2d');
+            const qqCtx = document.getElementById('qqChart').getContext('2d');
+            const orderCtx = document.getElementById('orderChart').getContext('2d');
+
+            let scatterChart, residChart, qqChart, orderChart;
+
+            // ── Sliders ──
+            const sliderMap = {
+                pred: { el: document.getElementById('predSlider'), span: document.getElementById('predVal') },
+                n: { el: document.getElementById('nSlider'), span: document.getElementById('nVal') },
+                intercept: { el: document.getElementById('interceptSlider'), span: document.getElementById('interceptVal') },
+                slope: { el: document.getElementById('slopeSlider'), span: document.getElementById('slopeVal') },
+                error: { el: document.getElementById('errorSlider'), span: document.getElementById('errorVal') },
+                outlier: { el: document.getElementById('outlierSlider'), span: document.getElementById('outlierVal') },
+                hetero: { el: document.getElementById('heteroSlider'), span: document.getElementById('heteroVal') },
+                quad: { el: document.getElementById('quadSlider'), span: document.getElementById('quadVal') },
+                auto: { el: document.getElementById('autoSlider'), span: document.getElementById('autoVal') }
+            };
+
+            const resetBtn = document.getElementById('resetBtn');
+            const seedLockBtn = document.getElementById('seedLockBtn');
+
+            // ── Seed lock ──
+            let seedLocked = false;
+            let lockedSeed = null;
+
+            function mulberry32(a) {
+                return function () {
+                    a |= 0; a = a + 0x6D2B79F5 | 0;
+                    let t = Math.imul(a ^ a >>> 15, 1 | a);
+                    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+                    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+                };
+            }
+
+            function newRng() {
+                if (seedLocked && lockedSeed !== null) {
+                    return mulberry32(lockedSeed);
+                }
+                const seed = Math.floor(Math.random() * 2147483647);
+                lockedSeed = seed;
+                return mulberry32(seed);
+            }
+
+            function normalRandom(rng, mean = 0, std = 1) {
+                let u = 0, v = 0;
+                while (u === 0) u = rng();
+                while (v === 0) v = rng();
+                const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+                return mean + std * z;
+            }
+
+            function generateX(n) {
+                const x = [];
+                for (let i = 0; i < n; i++) x.push((i / (n - 1)) * 10);
+                return x;
+            }
+
+            // ── Normal quantile (rational approx.) ──
+            function qnorm(p) {
+                if (p <= 0) return -Infinity;
+                if (p >= 1) return Infinity;
+                if (p === 0.5) return 0;
+                const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+                const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+                const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+                const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+                const pLow = 0.02425, pHigh = 1 - pLow;
+                let q;
+                if (p < pLow) {
+                    q = Math.sqrt(-2 * Math.log(p));
+                    return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+                        ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+                } else if (p <= pHigh) {
+                    q = p - 0.5;
+                    const r = q * q;
+                    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
+                        (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+                } else {
+                    q = Math.sqrt(-2 * Math.log(1 - p));
+                    return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+                        ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+                }
+            }
+
+            // ── Matrix helpers for multiple regression ──
+            function matTranspose(A, rows, cols) {
+                const T = new Array(cols).fill(null).map(() => new Array(rows));
+                for (let i = 0; i < rows; i++)
+                    for (let j = 0; j < cols; j++) T[j][i] = A[i][j];
+                return T;
+            }
+            function matMul(A, B, ar, ac, bc) {
+                const C = new Array(ar).fill(null).map(() => new Array(bc).fill(0));
+                for (let i = 0; i < ar; i++)
+                    for (let j = 0; j < bc; j++)
+                        for (let k = 0; k < ac; k++) C[i][j] += A[i][k] * B[k][j];
+                return C;
+            }
+            function matInvert(M, sz) {
+                // Gauss-Jordan on small matrix (max 5×5)
+                const A = M.map(r => [...r]);
+                const I = Array.from({ length: sz }, (_, i) => Array.from({ length: sz }, (_, j) => i === j ? 1 : 0));
+                for (let c = 0; c < sz; c++) {
+                    let maxR = c;
+                    for (let r = c + 1; r < sz; r++) if (Math.abs(A[r][c]) > Math.abs(A[maxR][c])) maxR = r;
+                    [A[c], A[maxR]] = [A[maxR], A[c]];
+                    [I[c], I[maxR]] = [I[maxR], I[c]];
+                    const piv = A[c][c];
+                    if (Math.abs(piv) < 1e-12) return null;
+                    for (let j = 0; j < sz; j++) { A[c][j] /= piv; I[c][j] /= piv; }
+                    for (let r = 0; r < sz; r++) {
+                        if (r === c) continue;
+                        const f = A[r][c];
+                        for (let j = 0; j < sz; j++) { A[r][j] -= f * A[c][j]; I[r][j] -= f * I[c][j]; }
+                    }
+                }
+                return I;
+            }
+            function matVecMul(A, v, rows, cols) {
+                const r = new Array(rows).fill(0);
+                for (let i = 0; i < rows; i++)
+                    for (let j = 0; j < cols; j++) r[i] += A[i][j] * v[j];
+                return r;
+            }
+
+            // ── Q-Q correlation (Filliben approximation) for normality check ──
+            function qqCorrelation(residuals) {
+                const n = residuals.length;
+                if (n < 4) return 1;
+                const sorted = [...residuals].sort((a, b) => a - b);
+                const mean = sorted.reduce((a, b) => a + b, 0) / n;
+                const sd = Math.sqrt(sorted.reduce((a, r) => a + (r - mean) ** 2, 0) / (n - 1)) || 1;
+                const stdResid = sorted.map(r => (r - mean) / sd);
+                const theoretical = stdResid.map((_, i) => qnorm((i + 0.5) / n));
+                const mt = theoretical.reduce((a, b) => a + b, 0) / n;
+                let num = 0, dT = 0, dS = 0;
+                for (let i = 0; i < n; i++) {
+                    num += (theoretical[i] - mt) * stdResid[i];
+                    dT += (theoretical[i] - mt) ** 2;
+                    dS += stdResid[i] ** 2;
+                }
+                return dT > 0 && dS > 0 ? num / Math.sqrt(dT * dS) : 1;
+            }
+
+            // Extra predictor true slopes
+            const EXTRA_SLOPES = [0.30, -0.20, 0.40];
+
+            // ── Compute data ──
+            function computeData() {
+                const rng = newRng();
+                const p = parseInt(sliderMap.pred.el.value, 10);  // number of predictors
+                const n = parseInt(sliderMap.n.el.value, 10);
+                const intercept = parseFloat(sliderMap.intercept.el.value);
+                const slope = parseFloat(sliderMap.slope.el.value);
+                const errorSD = parseFloat(sliderMap.error.el.value);
+                const outlierStrength = parseFloat(sliderMap.outlier.el.value);
+                const hetero = parseFloat(sliderMap.hetero.el.value);
+                const quad = parseFloat(sliderMap.quad.el.value);
+                const autoCorr = parseFloat(sliderMap.auto.el.value);
+
+                sliderMap.pred.span.innerText = p;
+                sliderMap.n.span.innerText = n;
+                sliderMap.intercept.span.innerText = intercept.toFixed(1);
+                sliderMap.slope.span.innerText = slope.toFixed(2);
+                sliderMap.error.span.innerText = errorSD.toFixed(1);
+                sliderMap.outlier.span.innerText = outlierStrength.toFixed(1);
+                sliderMap.hetero.span.innerText = hetero.toFixed(2);
+                sliderMap.quad.span.innerText = quad.toFixed(2);
+                sliderMap.auto.span.innerText = autoCorr.toFixed(2);
+
+                // Generate X1 (equally spaced)
+                const X1 = generateX(n);
+                // Generate extra predictors as random normals
+                const Xextra = [];  // p-1 arrays
+                for (let j = 1; j < p; j++) {
+                    const col = [];
+                    for (let i = 0; i < n; i++) col.push(normalRandom(rng, 5, 2.5));  // centered near 5
+                    Xextra.push(col);
+                }
+
+                // Build Y
+                const Y = [];
+                let prevError = 0;
+                for (let i = 0; i < n; i++) {
+                    const x1 = X1[i];
+                    let trueY = intercept + slope * x1 + quad * x1 * x1;
+                    // Add contributions from extra predictors
+                    for (let j = 0; j < Xextra.length; j++) {
+                        trueY += EXTRA_SLOPES[j] * Xextra[j][i];
+                    }
+                    let heteroFactor = 1 + hetero * (x1 / 10);
+                    let noise = normalRandom(rng, 0, errorSD * heteroFactor);
+                    noise = autoCorr * prevError + Math.sqrt(1 - autoCorr * autoCorr) * noise;
+                    prevError = noise;
+                    let y = trueY + noise;
+                    if (i === n - 1) y += outlierStrength;
+                    Y.push(y);
+                }
+
+                // OLS via normal equations: β = (X'X)⁻¹ X'Y
+                // Build design matrix [1, X1, X2, ...Xp]
+                const cols = 1 + p;  // intercept + p predictors
+                const Xmat = [];  // n × cols
+                for (let i = 0; i < n; i++) {
+                    const row = [1, X1[i]];
+                    for (let j = 0; j < Xextra.length; j++) row.push(Xextra[j][i]);
+                    Xmat.push(row);
+                }
+
+                const Xt = matTranspose(Xmat, n, cols);
+                const XtX = matMul(Xt, Xmat, cols, n, cols);
+                const XtXinv = matInvert(XtX, cols);
+                // X'Y as column vector
+                const XtY = [];
+                for (let j = 0; j < cols; j++) {
+                    let s = 0;
+                    for (let i = 0; i < n; i++) s += Xmat[i][j] * Y[i];
+                    XtY.push(s);
+                }
+                let betaHat;
+                if (XtXinv) {
+                    betaHat = matVecMul(XtXinv, XtY, cols, cols);
+                } else {
+                    betaHat = new Array(cols).fill(0);
+                }
+
+                const fitted = [];
+                for (let i = 0; i < n; i++) {
+                    let yh = 0;
+                    for (let j = 0; j < cols; j++) yh += betaHat[j] * Xmat[i][j];
+                    fitted.push(yh);
+                }
+                const residuals = Y.map((y, i) => y - fitted[i]);
+                const meanY = Y.reduce((a, b) => a + b, 0) / n;
+                const ssRes = residuals.reduce((a, r) => a + r * r, 0);
+                const ssTot = Y.reduce((a, y) => a + (y - meanY) ** 2, 0);
+                const r2 = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
+                const adjR2 = (n > cols) ? 1 - (1 - r2) * (n - 1) / (n - cols) : 0;
+                const rse = (n > cols) ? Math.sqrt(ssRes / (n - cols)) : 0;
+
+                const qqCorr = qqCorrelation(residuals);
+                return { X: X1, Y, fitted, residuals, betaHat, r2, adjR2, rse, n, p, qqCorr };
+            }
+
+            function updateStatsDisplay(data) {
+                // Build equation string
+                const b = data.betaHat;
+                let eq = `Ŷ = ${b[0] >= 0 ? b[0].toFixed(2) : '(' + b[0].toFixed(2) + ')'}`;
+                const labels = ['X₁', 'X₂', 'X₃', 'X₄'];
+                for (let j = 1; j < b.length; j++) {
+                    eq += ` ${b[j] >= 0 ? '+' : '−'} ${Math.abs(b[j]).toFixed(2)}·${labels[j - 1]}`;
+                }
+                document.getElementById('eqDisplay').textContent = eq;
+                document.getElementById('r2Display').textContent = data.r2.toFixed(3);
+                document.getElementById('adjR2Display').textContent = data.adjR2.toFixed(3);
+                document.getElementById('rseDisplay').textContent = data.rse.toFixed(3);
+            }
+
+            function updateHealth(qqCorr) {
+                const quad = Math.abs(parseFloat(sliderMap.quad.el.value));
+                const hetero = parseFloat(sliderMap.hetero.el.value);
+                const outlier = Math.abs(parseFloat(sliderMap.outlier.el.value));
+                const autoCorr = parseFloat(sliderMap.auto.el.value);
+
+                setHealth('h-linearity', 'Linearity', quad < 0.05 ? '✅ Good' : '⚠️ Curved', quad < 0.05);
+                setHealth('h-homosced', 'Homoscedasticity', hetero < 0.3 ? '✅ Good' : '⚠️ Fan shape', hetero < 0.3);
+                const normOk = qqCorr > 0.975;
+                setHealth('h-normality', 'Normality', normOk ? '✅ Good' : '⚠️ Check Q-Q', normOk);
+                setHealth('h-outlier', 'No Outliers', outlier < 3 ? '✅ Good' : '⚠️ Influential', outlier < 3);
+                setHealth('h-independence', 'Independence', autoCorr < 0.2 ? '✅ Good' : '⚠️ Autocorr.', autoCorr < 0.2);
+                updateInsightPanel(qqCorr);
+            }
+
+            function updateInsightPanel(qqCorr) {
+                const panel = document.getElementById('insightPanel');
+                const violations = [];
+
+                const quad = Math.abs(parseFloat(sliderMap.quad.el.value));
+                const hetero = parseFloat(sliderMap.hetero.el.value);
+                const outlier = Math.abs(parseFloat(sliderMap.outlier.el.value));
+                const autoCorr = parseFloat(sliderMap.auto.el.value);
+
+                if (quad >= 0.05) violations.push({ icon: '〰️', name: 'Non-Linearity', remedy: 'Add a polynomial term X² or transform X. Look for a U-shape in Residuals vs Fitted.' });
+                if (hetero >= 0.3) violations.push({ icon: '🌀', name: 'Heteroscedasticity', remedy: 'Use robust (HC) standard errors or weighted least squares (WLS). Log-transforming Y often helps.' });
+                if (qqCorr <= 0.975) violations.push({ icon: '📊', name: 'Non-Normality', remedy: 'Check for outliers first. Try log or square-root transform of Y. With n > 30, mild departures matter less.' });
+                if (outlier >= 3) violations.push({ icon: '💥', name: 'Influential Outlier', remedy: 'Verify it\'s not a data error. Check Cook\'s Distance. This high-leverage point is pulling the regression line.' });
+                if (autoCorr >= 0.2) violations.push({ icon: '🔗', name: 'Autocorrelation', remedy: 'Use GLS or ARIMA for time-series data. Durbin-Watson test confirms it. Cluster-robust SEs for grouped data.' });
+
+                if (violations.length === 0) {
+                    panel.classList.remove('visible');
+                    panel.innerHTML = '';
+                    return;
+                }
+
+                let html = '<div class="insight-title">⚠️ Active violations — suggested remedies:</div>';
+                violations.forEach(v => {
+                    html += `<div class="insight-row"><span class="insight-name">${v.icon} ${v.name}:</span><span>${v.remedy}</span></div>`;
+                });
+                panel.innerHTML = html;
+                panel.classList.add('visible');
+            }
+
+            function setHealth(id, label, status, isGood) {
+                const el = document.getElementById(id);
+                el.className = 'health-item ' + (isGood ? 'good' : 'warn');
+                el.querySelector('.health-label').textContent = label;
+                el.querySelector('.health-status').textContent = status;
+            }
+
+            const MAROON = '#660000';
+            const GREEN = '#16a34a';
+            const GOLD = '#c4911f';
+
+            function updateCharts() {
+                const data = computeData();
+                const { X, Y, fitted, residuals, n, p, betaHat, qqCorr } = data;
+                updateStatsDisplay(data);
+                updateHealth(qqCorr);
+
+                // 1. Scatter — switch to Y vs Ŷ when p > 1
+                const isMulti = p > 1;
+                const scatterTitle = document.getElementById('scatterTitle');
+                const scatterSub = document.getElementById('scatterSubtitle');
+                let scatterPoints, linePoints, xLabel, xAutoMin, xAutoMax;
+                if (isMulti) {
+                    // Y vs Ŷ (actual vs predicted)
+                    scatterPoints = fitted.map((f, i) => ({ x: f, y: Y[i] }));
+                    const allVals = [...fitted, ...Y];
+                    const lo = Math.min(...allVals), hi = Math.max(...allVals);
+                    linePoints = [{ x: lo, y: lo }, { x: hi, y: hi }];  // 45° line
+                    xLabel = 'Ŷ (predicted)';
+                    scatterTitle.textContent = 'Actual vs Predicted';
+                    scatterSub.style.display = 'block';
+                    xAutoMin = undefined; xAutoMax = undefined;
+                } else {
+                    scatterPoints = X.map((x, i) => ({ x, y: Y[i] }));
+                    linePoints = [{ x: 0, y: betaHat[0] }, { x: 10, y: betaHat[0] + betaHat[1] * 10 }];
+                    xLabel = 'X (predictor)';
+                    scatterTitle.textContent = 'Data + Regression Line';
+                    scatterSub.style.display = 'none';
+                    xAutoMin = -1; xAutoMax = 11;
+                }
+                if (scatterChart) {
+                    scatterChart.data.datasets[0].data = scatterPoints;
+                    scatterChart.data.datasets[1].data = linePoints;
+                    scatterChart.options.scales.x.title.text = xLabel;
+                    scatterChart.options.scales.x.min = xAutoMin;
+                    scatterChart.options.scales.x.max = xAutoMax;
+                    scatterChart.options.scales.y.title.text = isMulti ? 'Y (actual)' : 'Y (outcome)';
+                    scatterChart.update('none');
+                } else {
+                    scatterChart = new Chart(scatterCtx, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [
+                                { label: 'data', data: scatterPoints, backgroundColor: MAROON, pointRadius: 4, pointHoverRadius: 6 },
+                                { label: 'OLS', data: linePoints, type: 'line', borderColor: GOLD, borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0 }
+                            ]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: true, animation: { duration: 0 },
+                            scales: {
+                                x: { title: { display: true, text: xLabel, font: { weight: '600', size: 11 } }, min: xAutoMin, max: xAutoMax },
+                                y: { title: { display: true, text: 'Y (outcome)', font: { weight: '600', size: 11 } } }
+                            },
+                            plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                        }
+                    });
+                }
+
+                // 2. Residuals
+                const residPoints = fitted.map((f, i) => ({ x: f, y: residuals[i] }));
+                const fMin = Math.min(...fitted), fMax = Math.max(...fitted);
+                const zeroLine = [{ x: fMin - 1, y: 0 }, { x: fMax + 1, y: 0 }];
+                if (residChart) {
+                    residChart.data.datasets[0].data = residPoints;
+                    residChart.data.datasets[1].data = zeroLine;
+                    residChart.update('none');
+                } else {
+                    residChart = new Chart(residCtx, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [
+                                { label: 'residuals', data: residPoints, backgroundColor: GREEN, pointRadius: 4, pointHoverRadius: 6 },
+                                { label: 'zero', data: zeroLine, type: 'line', borderColor: '#94a3b8', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0 }
+                            ]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: true, animation: { duration: 0 },
+                            scales: {
+                                x: { title: { display: true, text: 'Fitted values', font: { weight: '600', size: 11 } } },
+                                y: { title: { display: true, text: 'Residuals', font: { weight: '600', size: 11 } } }
+                            },
+                            plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                        }
+                    });
+                }
+
+                // 3. Q-Q
+                const sortedResid = [...residuals].sort((a, b) => a - b);
+                const meanR = residuals.reduce((a, b) => a + b, 0) / n;
+                const sdR = Math.sqrt(residuals.reduce((a, r) => a + (r - meanR) ** 2, 0) / (n - 1)) || 1;
+                const standardized = sortedResid.map(r => (r - meanR) / sdR);
+                const qqPoints = standardized.map((z, i) => ({ x: qnorm((i + 0.5) / n), y: z }));
+                const qMin = qnorm(0.5 / n), qMax = qnorm(1 - 0.5 / n);
+                const refLine = [{ x: qMin, y: qMin }, { x: qMax, y: qMax }];
+                if (qqChart) {
+                    qqChart.data.datasets[0].data = qqPoints;
+                    qqChart.data.datasets[1].data = refLine;
+                    qqChart.update('none');
+                } else {
+                    qqChart = new Chart(qqCtx, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [
+                                { label: 'Q-Q', data: qqPoints, backgroundColor: '#7c3aed', pointRadius: 4, pointHoverRadius: 6 },
+                                { label: 'ref', data: refLine, type: 'line', borderColor: '#94a3b8', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0 }
+                            ]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: true, animation: { duration: 0 },
+                            scales: {
+                                x: { title: { display: true, text: 'Theoretical quantiles', font: { weight: '600', size: 11 } } },
+                                y: { title: { display: true, text: 'Sample quantiles', font: { weight: '600', size: 11 } } }
+                            },
+                            plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                        }
+                    });
+                }
+
+                // 4. Order
+                const orderPoints = residuals.map((r, i) => ({ x: i + 1, y: r }));
+                const orderZero = [{ x: 1, y: 0 }, { x: n, y: 0 }];
+                if (orderChart) {
+                    orderChart.data.datasets[0].data = orderPoints;
+                    orderChart.data.datasets[1].data = orderPoints;
+                    orderChart.data.datasets[2].data = orderZero;
+                    orderChart.update('none');
+                } else {
+                    orderChart = new Chart(orderCtx, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [
+                                { label: 'residuals', data: orderPoints, backgroundColor: '#e67300', pointRadius: 4, pointHoverRadius: 6 },
+                                { label: 'trend', data: orderPoints, type: 'line', borderColor: 'rgba(230,115,0,0.25)', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3 },
+                                { label: 'zero', data: orderZero, type: 'line', borderColor: '#94a3b8', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0 }
+                            ]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: true, animation: { duration: 0 },
+                            scales: {
+                                x: { title: { display: true, text: 'Observation order', font: { weight: '600', size: 11 } }, min: 0 },
+                                y: { title: { display: true, text: 'Residuals', font: { weight: '600', size: 11 } } }
+                            },
+                            plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                        }
+                    });
+                }
+            }
+
+            // ── Event listeners ──
+            Object.values(sliderMap).forEach(s => s.el.addEventListener('input', updateCharts));
+
+            seedLockBtn.addEventListener('click', () => {
+                seedLocked = !seedLocked;
+                if (!seedLocked) lockedSeed = null;
+                seedLockBtn.textContent = seedLocked ? '🔒 Seed locked' : '🔓 Seed unlocked';
+                seedLockBtn.classList.toggle('locked', seedLocked);
+            });
+
+            document.querySelectorAll('.info-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    document.getElementById(btn.dataset.info).classList.toggle('open');
+                });
+            });
+
+            const presets = {
+                healthy: { pred: 1, n: 30, intercept: 0, slope: 0.5, error: 1, outlier: 0, hetero: 0, quad: 0, auto: 0 },
+                megaphone: { pred: 1, n: 60, intercept: 0, slope: 0.5, error: 1.2, outlier: 0, hetero: 2.5, quad: 0, auto: 0 },
+                curved: { pred: 1, n: 50, intercept: 2, slope: 0.5, error: 0.8, outlier: 0, hetero: 0, quad: 0.2, auto: 0 },
+                outlier: { pred: 1, n: 30, intercept: 0, slope: 0.5, error: 0.8, outlier: 12, hetero: 0, quad: 0, auto: 0 },
+                autocorr: { pred: 1, n: 60, intercept: 0, slope: 0.5, error: 1, outlier: 0, hetero: 0, quad: 0, auto: 0.85 },
+                chaos: { pred: 1, n: 40, intercept: 1, slope: 0.8, error: 1.5, outlier: 10, hetero: 2, quad: 0.15, auto: 0.6 }
+            };
+
+            function applyPreset(name) {
+                const p = presets[name];
+                if (!p) return;
+                sliderMap.pred.el.value = p.pred;
+                sliderMap.n.el.value = p.n;
+                sliderMap.intercept.el.value = p.intercept;
+                sliderMap.slope.el.value = p.slope;
+                sliderMap.error.el.value = p.error;
+                sliderMap.outlier.el.value = p.outlier;
+                sliderMap.hetero.el.value = p.hetero;
+                sliderMap.quad.el.value = p.quad;
+                sliderMap.auto.el.value = p.auto;
+                seedLocked = false;
+                lockedSeed = null;
+                seedLockBtn.textContent = '🔓 Seed unlocked';
+                seedLockBtn.classList.remove('locked');
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                document.querySelector(`[data-preset="${name}"]`)?.classList.add('active');
+                updateCharts();
+            }
+
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+            });
+
+            resetBtn.addEventListener('click', () => applyPreset('healthy'));
+
+            updateCharts();
+        })();
+    </script>
+</body>
+
+</html>
