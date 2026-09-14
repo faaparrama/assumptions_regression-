@@ -202,6 +202,46 @@
             background: #f59e0b;
         }
 
+        .health-item.bad {
+            border-color: #fca5a5;
+            background: linear-gradient(135deg, #fef2f2, #fee2e2);
+            animation: pulse-warn 2s ease-in-out infinite;
+        }
+
+        .health-item.bad .health-dot {
+            background: #dc2626;
+        }
+
+        .health-stat {
+            font-size: 0.68rem;
+            color: #8b7b6b;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            margin-top: 2px;
+        }
+
+        .dash-note {
+            font-size: 0.75rem;
+            color: #7b6b5b;
+            font-style: italic;
+            margin: -6px 0 14px;
+            line-height: 1.4;
+        }
+
+        .stat-chip .chip-note {
+            font-size: 0.7rem;
+            color: #6b5b4b;
+            line-height: 1.3;
+        }
+
+        .stat-chip .chip-note.hit {
+            color: #15803d;
+        }
+
+        .stat-chip .chip-note.miss {
+            color: #b91c1c;
+            font-weight: 600;
+        }
+
         .health-label {
             font-size: 0.8rem;
             font-weight: 600;
@@ -759,6 +799,19 @@
                     <span class="label">Residual Std. Error</span>
                     <span class="value" id="rseDisplay">0.000</span>
                 </div>
+                <div class="stat-chip">
+                    <span class="label">Slope b₁ (SE)</span>
+                    <span class="value" id="slopeSeDisplay">0.00 (0.00)</span>
+                </div>
+                <div class="stat-chip">
+                    <span class="label">95% CI for β₁</span>
+                    <span class="value" id="ciDisplay">[–, –]</span>
+                    <span class="chip-note" id="ciNote"></span>
+                </div>
+                <div class="stat-chip">
+                    <span class="label">p (slope = 0)</span>
+                    <span class="value" id="pDisplay">–</span>
+                </div>
             </div>
 
             <!-- Health dashboard -->
@@ -768,6 +821,7 @@
                     <div>
                         <div class="health-label">Linearity</div>
                         <div class="health-status">✅ Good</div>
+                        <div class="health-stat">–</div>
                     </div>
                 </div>
                 <div class="health-item good" id="h-homosced">
@@ -775,6 +829,7 @@
                     <div>
                         <div class="health-label">Homoscedasticity</div>
                         <div class="health-status">✅ Good</div>
+                        <div class="health-stat">–</div>
                     </div>
                 </div>
                 <div class="health-item good" id="h-normality">
@@ -782,13 +837,15 @@
                     <div>
                         <div class="health-label">Normality</div>
                         <div class="health-status">✅ Good</div>
+                        <div class="health-stat">–</div>
                     </div>
                 </div>
                 <div class="health-item good" id="h-outlier">
                     <div class="health-dot"></div>
                     <div>
-                        <div class="health-label">No Outliers</div>
+                        <div class="health-label">Influential Points</div>
                         <div class="health-status">✅ Good</div>
+                        <div class="health-stat">–</div>
                     </div>
                 </div>
                 <div class="health-item good" id="h-independence">
@@ -796,18 +853,21 @@
                     <div>
                         <div class="health-label">Independence</div>
                         <div class="health-status">✅ Good</div>
+                        <div class="health-stat">–</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Insight panel: shown when violations are active -->
+            <div class="dash-note">Verdicts are computed from the <strong>residuals</strong>, not from your sliders. A small sample can hide a real violation, and a healthy sample can trip a test by chance — press 🎲 <strong>New sample</strong> and see whether the flag persists.</div>
+
+            <!-- Insight panel: shown when violations are detected -->
             <div class="insight-panel" id="insightPanel"></div>
 
             <!-- 4 charts in 2×2 grid -->
             <div class="chart-grid">
                 <div class="chart-box">
                     <h3>📈 <span id="scatterTitle">Data + Regression Line</span></h3>
-                    <div class="chart-hint" id="scatterHint">Look for: points scattered evenly around the line with no obvious curve</div>
+                    <div class="chart-hint" id="scatterHint">Look for: points scattered evenly around the line with no obvious curve. <span style="color:#c4911f;font-weight:600">— OLS fit</span> vs <span style="color:#3b82f6;font-weight:600">- - true relationship</span>: the gap is bias.</div>
                     <div id="scatterSubtitle"
                         style="font-size:0.68rem; color:#8b7b6b; margin:-4px 0 6px; display:none;">When p > 1, shows Y
                         vs Ŷ (actual vs predicted)</div>
@@ -852,8 +912,8 @@
 
             <!-- Seed lock -->
             <div class="seed-lock">
-                <button class="seed-lock-btn" id="seedLockBtn">🔓 Seed unlocked</button>
-                <span class="seed-lock-hint">Freeze the random sample so only your slider changes</span>
+                <button class="seed-lock-btn locked" id="newSampleBtn" title="Draw a fresh random sample with the same settings">🎲 New sample</button>
+                <span class="seed-lock-hint">Sliders change only the setting — the same random draws are reused, so what moves is the effect of the slider. Press 🎲 for a fresh sample.</span>
             </div>
 
             <hr class="divider">
@@ -1023,11 +1083,10 @@
             };
 
             const resetBtn = document.getElementById('resetBtn');
-            const seedLockBtn = document.getElementById('seedLockBtn');
+            const newSampleBtn = document.getElementById('newSampleBtn');
 
-            // ── Seed lock ──
-            let seedLocked = false;
-            let lockedSeed = null;
+            // ── One seed per sample. Sliders reuse it; only 🎲 draws a new one. ──
+            let seed = Math.floor(Math.random() * 2147483647);
 
             function mulberry32(a) {
                 return function () {
@@ -1038,13 +1097,8 @@
                 };
             }
 
-            function newRng() {
-                if (seedLocked && lockedSeed !== null) {
-                    return mulberry32(lockedSeed);
-                }
-                const seed = Math.floor(Math.random() * 2147483647);
-                lockedSeed = seed;
-                return mulberry32(seed);
+            function rngStreams() {
+                return { noise: mulberry32(seed), extra: mulberry32((seed ^ 0x9E3779B9) >>> 0) };
             }
 
             function normalRandom(rng, mean = 0, std = 1) {
@@ -1129,7 +1183,59 @@
                 return r;
             }
 
-            // ── Q-Q correlation (Filliben approximation) for normality check ──
+            // ── Distribution helpers (for p-values and CIs) ──
+            function lgamma(x) {  // Lanczos approximation
+                const g = 7, c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+                    -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+                if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+                x -= 1;
+                let a = c[0]; const t = x + g + 0.5;
+                for (let i = 1; i < g + 2; i++) a += c[i] / (x + i);
+                return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+            }
+            function betacf(a, b, x) {  // continued fraction for the incomplete beta (Numerical Recipes)
+                const FPMIN = 1e-300; const qab = a + b, qap = a + 1, qam = a - 1;
+                let c = 1, d = 1 - qab * x / qap; if (Math.abs(d) < FPMIN) d = FPMIN; d = 1 / d; let h = d;
+                for (let m = 1; m <= 200; m++) {
+                    const m2 = 2 * m;
+                    let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+                    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN; d = 1 / d; h *= d * c;
+                    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+                    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN; d = 1 / d;
+                    const del = d * c; h *= del; if (Math.abs(del - 1) < 3e-14) break;
+                }
+                return h;
+            }
+            function ibeta(a, b, x) {  // regularized incomplete beta I_x(a, b)
+                if (x <= 0) return 0; if (x >= 1) return 1;
+                const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+                return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b;
+            }
+            function tPValue(t, df) {  // two-sided p for a t statistic
+                if (!isFinite(t)) return 0;
+                return ibeta(df / 2, 0.5, df / (df + t * t));
+            }
+            function tCrit(df, alpha = 0.05) {  // two-sided critical t by bisection
+                let lo = 0, hi = 200;
+                for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (tPValue(mid, df) > alpha) lo = mid; else hi = mid; }
+                return (lo + hi) / 2;
+            }
+            function erf(x) {  // Abramowitz & Stegun 7.1.26
+                const s = x < 0 ? -1 : 1; x = Math.abs(x);
+                const t = 1 / (1 + 0.3275911 * x);
+                const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+                return s * y;
+            }
+            function chi2OneP(x) {  // upper-tail p for chi-square with 1 df
+                if (!(x > 0)) return 1;
+                return 2 * (1 - 0.5 * (1 + erf(Math.sqrt(x) / Math.SQRT2)));
+            }
+            function fmtP(p) {
+                if (!isFinite(p)) return '–';
+                return p < 0.001 ? 'p < .001' : 'p = ' + p.toFixed(3).replace(/^0/, '');
+            }
+
+            // ── Q-Q correlation (Filliben-style) for normality check ──
             function qqCorrelation(residuals) {
                 const n = residuals.length;
                 if (n < 4) return 1;
@@ -1147,13 +1253,105 @@
                 }
                 return dT > 0 && dS > 0 ? num / Math.sqrt(dT * dS) : 1;
             }
+            // Critical values of the Q-Q correlation under normality (α = .05 and .01),
+            // simulated for this exact plotting position; interpolated in n.
+            const QQ_CRIT = [[10, .9244, .8940], [15, .9373, .9105], [20, .9503, .9308], [30, .9657, .9519], [40, .9722, .9565],
+                             [50, .9772, .9677], [75, .9836, .9758], [100, .9876, .9822], [150, .9914, .9880], [200, .9934, .9908]];
+            function qqCritical(n) {
+                if (n <= QQ_CRIT[0][0]) return { c05: QQ_CRIT[0][1], c01: QQ_CRIT[0][2] };
+                const last = QQ_CRIT[QQ_CRIT.length - 1];
+                if (n >= last[0]) return { c05: last[1], c01: last[2] };
+                for (let k = 1; k < QQ_CRIT.length; k++) {
+                    const [n1, a1, b1] = QQ_CRIT[k - 1], [n2, a2, b2] = QQ_CRIT[k];
+                    if (n <= n2) { const w = (n - n1) / (n2 - n1); return { c05: a1 + w * (a2 - a1), c01: b1 + w * (b2 - b1) }; }
+                }
+                return { c05: last[1], c01: last[2] };
+            }
+
+            // ── General OLS: everything the diagnostics need ──
+            function ols(Xmat, Y) {
+                const n = Xmat.length, cols = Xmat[0].length;
+                const Xt = matTranspose(Xmat, n, cols);
+                const XtX = matMul(Xt, Xmat, cols, n, cols);
+                const XtXinv = matInvert(XtX, cols);
+                const XtY = new Array(cols).fill(0);
+                for (let j = 0; j < cols; j++) for (let i = 0; i < n; i++) XtY[j] += Xmat[i][j] * Y[i];
+                const beta = XtXinv ? matVecMul(XtXinv, XtY, cols, cols) : new Array(cols).fill(0);
+                const fitted = Xmat.map(row => row.reduce((s, v, j) => s + v * beta[j], 0));
+                const resid = Y.map((y, i) => y - fitted[i]);
+                const ssRes = resid.reduce((a, r) => a + r * r, 0);
+                const df = n - cols;
+                const mse = df > 0 ? ssRes / df : 0;
+                // leverage h_ii = x_i' (X'X)⁻¹ x_i
+                const leverage = Xmat.map(row => {
+                    if (!XtXinv) return 0;
+                    let h = 0;
+                    for (let a = 0; a < cols; a++) for (let b = 0; b < cols; b++) h += row[a] * XtXinv[a][b] * row[b];
+                    return h;
+                });
+                return { beta, XtXinv, fitted, resid, ssRes, df, mse, leverage, cols, n };
+            }
+
+            // ── Diagnostics computed from the residuals (never from the sliders) ──
+            function diagnose(fit, Xmat, Y) {
+                const { resid, fitted, mse, df, leverage, cols, n, ssRes } = fit;
+                const degenerate = ssRes < 1e-10 || df < 3;
+                const verdict = (bad, warn) => bad ? 'bad' : (warn ? 'warn' : 'good');
+
+                // 1. Linearity — RESET-style: does (fitted)² explain leftover variation?
+                let reset = { t: NaN, p: NaN };
+                if (!degenerate) {
+                    const fMean = fitted.reduce((a, b) => a + b, 0) / n;
+                    const aug = ols(Xmat.map((row, i) => [...row, (fitted[i] - fMean) ** 2]), Y);
+                    if (aug.XtXinv && aug.df > 0) {
+                        const j = cols, se = Math.sqrt(aug.mse * aug.XtXinv[j][j]);
+                        const t = se > 0 ? aug.beta[j] / se : 0;
+                        reset = { t, p: tPValue(t, aug.df) };
+                    }
+                }
+                // 2. Equal variance — Breusch-Pagan (Koenker): regress e² on fitted, LM = n·R² ~ χ²(1)
+                let bp = { lm: NaN, p: NaN };
+                if (!degenerate) {
+                    const e2 = resid.map(r => r * r);
+                    const aux = ols(fitted.map(f => [1, f]), e2);
+                    const m = e2.reduce((a, b) => a + b, 0) / n;
+                    const ssT = e2.reduce((a, v) => a + (v - m) ** 2, 0);
+                    const lm = n * (ssT > 0 ? 1 - aux.ssRes / ssT : 0);
+                    bp = { lm, p: chi2OneP(lm) };
+                }
+                // 3. Normality — Q-Q correlation vs its simulated critical value for this n
+                const r = qqCorrelation(resid), crit = qqCritical(n);
+                // 4. Influence — Cook's D for every point
+                let maxD = 0, maxIdx = -1;
+                if (!degenerate) resid.forEach((e, i) => {
+                    const h = leverage[i];
+                    const D = (e * e / (cols * mse)) * h / ((1 - h) ** 2);
+                    if (D > maxD) { maxD = D; maxIdx = i; }
+                });
+                // 5. Independence — Durbin-Watson; flagged via lag-1 autocorrelation z ≈ (1 − DW/2)·√n
+                let dw = NaN, z = 0;
+                if (!degenerate) {
+                    let num = 0;
+                    for (let i = 1; i < n; i++) num += (resid[i] - resid[i - 1]) ** 2;
+                    dw = num / ssRes;
+                    z = (1 - dw / 2) * Math.sqrt(n);
+                }
+                return {
+                    degenerate,
+                    linearity:    { ...reset, level: degenerate ? 'good' : verdict(reset.p < 0.01, reset.p < 0.05) },
+                    variance:     { ...bp,    level: degenerate ? 'good' : verdict(bp.p < 0.01, bp.p < 0.05) },
+                    normality:    { r, crit,  level: degenerate ? 'good' : verdict(r < crit.c01, r < crit.c05) },
+                    influence:    { maxD, maxIdx, level: verdict(maxD > 1, maxD > 0.7) },
+                    independence: { dw,       level: degenerate ? 'good' : verdict(Math.abs(z) > 2.576, Math.abs(z) > 1.96) }
+                };
+            }
 
             // Extra predictor true slopes
             const EXTRA_SLOPES = [0.30, -0.20, 0.40];
 
             // ── Compute data ──
             function computeData() {
-                const rng = newRng();
+                const rng = rngStreams();
                 const p = parseInt(sliderMap.pred.el.value, 10);  // number of predictors
                 const n = parseInt(sliderMap.n.el.value, 10);
                 const intercept = parseFloat(sliderMap.intercept.el.value);
@@ -1180,7 +1378,7 @@
                 const Xextra = [];  // p-1 arrays
                 for (let j = 1; j < p; j++) {
                     const col = [];
-                    for (let i = 0; i < n; i++) col.push(normalRandom(rng, 5, 2.5));  // centered near 5
+                    for (let i = 0; i < n; i++) col.push(normalRandom(rng.extra, 5, 2.5));  // centered near 5
                     Xextra.push(col);
                 }
 
@@ -1195,7 +1393,7 @@
                         trueY += EXTRA_SLOPES[j] * Xextra[j][i];
                     }
                     let heteroFactor = 1 + hetero * (x1 / 10);
-                    let noise = normalRandom(rng, 0, errorSD * heteroFactor);
+                    let noise = normalRandom(rng.noise, 0, errorSD * heteroFactor);
                     noise = autoCorr * prevError + Math.sqrt(1 - autoCorr * autoCorr) * noise;
                     prevError = noise;
                     let y = trueY + noise;
@@ -1203,49 +1401,37 @@
                     Y.push(y);
                 }
 
-                // OLS via normal equations: β = (X'X)⁻¹ X'Y
-                // Build design matrix [1, X1, X2, ...Xp]
-                const cols = 1 + p;  // intercept + p predictors
-                const Xmat = [];  // n × cols
+                // OLS via normal equations: β = (X'X)⁻¹ X'Y  — design matrix [1, X1, X2, ...Xp]
+                const Xmat = [];
                 for (let i = 0; i < n; i++) {
                     const row = [1, X1[i]];
                     for (let j = 0; j < Xextra.length; j++) row.push(Xextra[j][i]);
                     Xmat.push(row);
                 }
+                const fit = ols(Xmat, Y);
+                const { beta: betaHat, fitted, resid: residuals, ssRes, df, mse, cols } = fit;
 
-                const Xt = matTranspose(Xmat, n, cols);
-                const XtX = matMul(Xt, Xmat, cols, n, cols);
-                const XtXinv = matInvert(XtX, cols);
-                // X'Y as column vector
-                const XtY = [];
-                for (let j = 0; j < cols; j++) {
-                    let s = 0;
-                    for (let i = 0; i < n; i++) s += Xmat[i][j] * Y[i];
-                    XtY.push(s);
-                }
-                let betaHat;
-                if (XtXinv) {
-                    betaHat = matVecMul(XtXinv, XtY, cols, cols);
-                } else {
-                    betaHat = new Array(cols).fill(0);
-                }
-
-                const fitted = [];
-                for (let i = 0; i < n; i++) {
-                    let yh = 0;
-                    for (let j = 0; j < cols; j++) yh += betaHat[j] * Xmat[i][j];
-                    fitted.push(yh);
-                }
-                const residuals = Y.map((y, i) => y - fitted[i]);
                 const meanY = Y.reduce((a, b) => a + b, 0) / n;
-                const ssRes = residuals.reduce((a, r) => a + r * r, 0);
                 const ssTot = Y.reduce((a, y) => a + (y - meanY) ** 2, 0);
                 const r2 = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
                 const adjR2 = (n > cols) ? 1 - (1 - r2) * (n - 1) / (n - cols) : 0;
-                const rse = (n > cols) ? Math.sqrt(ssRes / (n - cols)) : 0;
+                const rse = Math.sqrt(mse);
 
-                const qqCorr = qqCorrelation(residuals);
-                return { X: X1, Y, fitted, residuals, betaHat, r2, adjR2, rse, n, p, qqCorr };
+                // Inference on the slope of X1 — this is what the assumptions actually protect
+                const seB1 = (fit.XtXinv && df > 0) ? Math.sqrt(mse * fit.XtXinv[1][1]) : NaN;
+                const tB1 = seB1 > 0 ? betaHat[1] / seB1 : Infinity;
+                const pB1 = df > 0 ? tPValue(tB1, df) : NaN;
+                const tc = df > 0 ? tCrit(df) : NaN;
+                const ci = [betaHat[1] - tc * seB1, betaHat[1] + tc * seB1];
+
+                const diag = diagnose(fit, Xmat, Y);
+
+                // The true relationship the sliders define (drawn on the scatter when p = 1)
+                const trueCurve = [];
+                for (let x = 0; x <= 10.0001; x += 0.25) trueCurve.push({ x, y: intercept + slope * x + quad * x * x });
+
+                return { X: X1, Y, fitted, residuals, betaHat, r2, adjR2, rse, n, p, seB1, tB1, pB1, ci,
+                         trueSlope: slope, isCurved: Math.abs(quad) > 1e-9, trueCurve, diag };
             }
 
             function updateStatsDisplay(data) {
@@ -1260,74 +1446,123 @@
                 document.getElementById('r2Display').textContent = data.r2.toFixed(3);
                 document.getElementById('adjR2Display').textContent = data.adjR2.toFixed(3);
                 document.getElementById('rseDisplay').textContent = data.rse.toFixed(3);
+
+                const ok = isFinite(data.seB1) && data.seB1 > 0;
+                document.getElementById('slopeSeDisplay').textContent = ok ? `${b[1].toFixed(2)} (${data.seB1.toFixed(3)})` : `${b[1].toFixed(2)} (–)`;
+                document.getElementById('ciDisplay').textContent = ok ? `[${data.ci[0].toFixed(2)}, ${data.ci[1].toFixed(2)}]` : '[–, –]';
+                document.getElementById('pDisplay').textContent = ok ? fmtP(data.pB1).replace('p ', '') : '–';
+
+                const note = document.getElementById('ciNote');
+                note.className = 'chip-note';
+                if (!ok) { note.textContent = 'no noise → no uncertainty'; }
+                else if (data.isCurved) { note.textContent = 'true relationship is curved — no single β₁ exists'; }
+                else {
+                    const inside = data.trueSlope >= data.ci[0] && data.trueSlope <= data.ci[1];
+                    note.textContent = `true β₁ = ${data.trueSlope.toFixed(2)} → ${inside ? 'inside ✓' : 'MISSED ✗'}`;
+                    note.classList.add(inside ? 'hit' : 'miss');
+                }
             }
 
-            function updateHealth(qqCorr) {
-                const quad = Math.abs(parseFloat(sliderMap.quad.el.value));
-                const hetero = parseFloat(sliderMap.hetero.el.value);
-                const outlier = Math.abs(parseFloat(sliderMap.outlier.el.value));
-                const autoCorr = parseFloat(sliderMap.auto.el.value);
+            const LEVEL_TEXT = {
+                linearity:    { good: '✅ No curvature',  warn: '🤔 Slight curve?',   bad: '⚠️ Curved' },
+                variance:     { good: '✅ Even spread',   warn: '🤔 Uneven spread?',  bad: '⚠️ Fan shape' },
+                normality:    { good: '✅ On the line',   warn: '🤔 Some departure',  bad: '⚠️ Off the line' },
+                influence:    { good: '✅ None',          warn: '🤔 One to check',    bad: '⚠️ Influential point' },
+                independence: { good: '✅ No pattern',    warn: '🤔 Some runs?',      bad: '⚠️ Autocorrelated' }
+            };
 
-                setHealth('h-linearity', 'Linearity', quad < 0.05 ? '✅ Good' : '⚠️ Curved', quad < 0.05);
-                setHealth('h-homosced', 'Homoscedasticity', hetero < 0.3 ? '✅ Good' : '⚠️ Fan shape', hetero < 0.3);
-                const normOk = qqCorr > 0.975;
-                setHealth('h-normality', 'Normality', normOk ? '✅ Good' : '⚠️ Check Q-Q', normOk);
-                setHealth('h-outlier', 'No Outliers', outlier < 3 ? '✅ Good' : '⚠️ Influential', outlier < 3);
-                setHealth('h-independence', 'Independence', autoCorr < 0.2 ? '✅ Good' : '⚠️ Autocorr.', autoCorr < 0.2);
-                updateInsightPanel(qqCorr);
+            function updateHealth(data) {
+                const d = data.diag;
+                if (d.degenerate) {
+                    ['h-linearity', 'h-homosced', 'h-normality', 'h-outlier', 'h-independence'].forEach(id => setHealth(id, 'good', '— no residual variation', 'tests need noise > 0'));
+                    updateInsightPanel(d);
+                    return;
+                }
+                setHealth('h-linearity', d.linearity.level, LEVEL_TEXT.linearity[d.linearity.level],
+                    `RESET t = ${d.linearity.t.toFixed(2)}, ${fmtP(d.linearity.p)}`);
+                setHealth('h-homosced', d.variance.level, LEVEL_TEXT.variance[d.variance.level],
+                    `Breusch-Pagan = ${d.variance.lm.toFixed(2)}, ${fmtP(d.variance.p)}`);
+                setHealth('h-normality', d.normality.level, LEVEL_TEXT.normality[d.normality.level],
+                    `Q-Q corr r = ${d.normality.r.toFixed(3)} (cutoff ${d.normality.crit.c05.toFixed(3)})`);
+                setHealth('h-outlier', d.influence.level, LEVEL_TEXT.influence[d.influence.level],
+                    `max Cook's D = ${d.influence.maxD.toFixed(2)} (flag > 1)`);
+                setHealth('h-independence', d.independence.level, LEVEL_TEXT.independence[d.independence.level],
+                    `Durbin-Watson = ${d.independence.dw.toFixed(2)} (ideal ≈ 2)`);
+                updateInsightPanel(d);
             }
 
-            function updateInsightPanel(qqCorr) {
+            const REMEDIES = {
+                linearity:    { icon: '〰️', name: 'Non-Linearity',      text: 'Add a polynomial term X² or transform X. Look for a U-shape in Residuals vs Fitted.' },
+                variance:     { icon: '🌀', name: 'Heteroscedasticity', text: 'Use robust (HC) standard errors or weighted least squares (WLS). Log-transforming Y often helps.' },
+                normality:    { icon: '📊', name: 'Non-Normality',      text: 'Check for outliers first. Try a log or square-root transform of Y. With n > 30, mild departures matter less.' },
+                influence:    { icon: '💥', name: 'Influential Point',  text: 'Verify it is not a data error. Cook\'s D says how far the line moves if this point is dropped — the red point on the charts.' },
+                independence: { icon: '🔗', name: 'Autocorrelation',    text: 'Use GLS or ARIMA for time-series data; cluster-robust SEs for grouped data. Durbin-Watson far from 2 confirms it.' }
+            };
+
+            function updateInsightPanel(d) {
                 const panel = document.getElementById('insightPanel');
-                const violations = [];
-
-                const quad = Math.abs(parseFloat(sliderMap.quad.el.value));
-                const hetero = parseFloat(sliderMap.hetero.el.value);
-                const outlier = Math.abs(parseFloat(sliderMap.outlier.el.value));
-                const autoCorr = parseFloat(sliderMap.auto.el.value);
-
-                if (quad >= 0.05) violations.push({ icon: '〰️', name: 'Non-Linearity', remedy: 'Add a polynomial term X² or transform X. Look for a U-shape in Residuals vs Fitted.' });
-                if (hetero >= 0.3) violations.push({ icon: '🌀', name: 'Heteroscedasticity', remedy: 'Use robust (HC) standard errors or weighted least squares (WLS). Log-transforming Y often helps.' });
-                if (qqCorr <= 0.975) violations.push({ icon: '📊', name: 'Non-Normality', remedy: 'Check for outliers first. Try log or square-root transform of Y. With n > 30, mild departures matter less.' });
-                if (outlier >= 3) violations.push({ icon: '💥', name: 'Influential Outlier', remedy: 'Verify it\'s not a data error. Check Cook\'s Distance. This high-leverage point is pulling the regression line.' });
-                if (autoCorr >= 0.2) violations.push({ icon: '🔗', name: 'Autocorrelation', remedy: 'Use GLS or ARIMA for time-series data. Durbin-Watson test confirms it. Cluster-robust SEs for grouped data.' });
-
-                if (violations.length === 0) {
+                const bad = [], borderline = [];
+                if (!d.degenerate) {
+                    for (const key of Object.keys(REMEDIES)) {
+                        if (d[key].level === 'bad') bad.push(REMEDIES[key]);
+                        else if (d[key].level === 'warn') borderline.push(REMEDIES[key]);
+                    }
+                }
+                if (bad.length === 0 && borderline.length === 0) {
                     panel.classList.remove('visible');
                     panel.innerHTML = '';
                     return;
                 }
-
-                let html = '<div class="insight-title">⚠️ Active violations — suggested remedies:</div>';
-                violations.forEach(v => {
-                    html += `<div class="insight-row"><span class="insight-name">${v.icon} ${v.name}:</span><span>${v.remedy}</span></div>`;
-                });
+                let html = '';
+                if (bad.length) {
+                    html += '<div class="insight-title">⚠️ Detected in the residuals — what it means and what to do:</div>';
+                    bad.forEach(v => {
+                        html += `<div class="insight-row"><span class="insight-name">${v.icon} ${v.name}:</span><span>${v.text}</span></div>`;
+                    });
+                    // Order = X order in this simulation, so curvature and autocorrelation can masquerade as each other
+                    if (d.linearity.level !== 'good' && d.independence.level !== 'good') {
+                        html += `<div class="insight-row"><span class="insight-name">🔍 Both flagged?</span><span>Here the observations are ordered by X, so a curve looks like runs of same-sign residuals, and slowly wandering errors look like a curve. Real data do this too — ask which violation the study design makes plausible, and fix that one first.</span></div>`;
+                    }
+                }
+                if (borderline.length) {
+                    html += `<div class="insight-row"><span class="insight-name">🤔 Borderline:</span><span>${borderline.map(v => v.name).join(', ')} — press 🎲 <strong>New sample</strong>. A flag that vanishes on resampling was noise (a healthy sample trips a test about 1 time in 20); one that keeps coming back is real.</span></div>`;
+                }
                 panel.innerHTML = html;
                 panel.classList.add('visible');
             }
 
-            function setHealth(id, label, status, isGood) {
+            function setHealth(id, level, status, stat) {
                 const el = document.getElementById(id);
-                el.className = 'health-item ' + (isGood ? 'good' : 'warn');
-                el.querySelector('.health-label').textContent = label;
+                el.className = 'health-item ' + level;
                 el.querySelector('.health-status').textContent = status;
+                el.querySelector('.health-stat').textContent = stat;
             }
 
             const MAROON = '#660000';
             const GREEN = '#16a34a';
             const GOLD = '#c4911f';
+            const TRUE_BLUE = '#3b82f6';
+            const FLAG_RED = '#dc2626';
+            let showTrueLine = true;  // read by the scatter legend filter
+
+            // Colour every point normally, except the most influential one when Cook's D flags it
+            function pointColors(base, n, diag) {
+                const flagged = diag.influence.level !== 'good' ? diag.influence.maxIdx : -1;
+                return Array.from({ length: n }, (_, i) => i === flagged ? FLAG_RED : base);
+            }
 
             function updateCharts() {
                 const data = computeData();
-                const { X, Y, fitted, residuals, n, p, betaHat, qqCorr } = data;
+                const { X, Y, fitted, residuals, n, p, betaHat, diag, trueCurve } = data;
                 updateStatsDisplay(data);
-                updateHealth(qqCorr);
+                updateHealth(data);
 
                 // 1. Scatter — switch to Y vs Ŷ when p > 1
                 const isMulti = p > 1;
                 const scatterTitle = document.getElementById('scatterTitle');
                 const scatterSub = document.getElementById('scatterSubtitle');
                 let scatterPoints, linePoints, xLabel, xAutoMin, xAutoMax;
+                showTrueLine = !isMulti;
                 if (isMulti) {
                     // Y vs Ŷ (actual vs predicted)
                     scatterPoints = fitted.map((f, i) => ({ x: f, y: Y[i] }));
@@ -1348,7 +1583,9 @@
                 }
                 if (scatterChart) {
                     scatterChart.data.datasets[0].data = scatterPoints;
+                    scatterChart.data.datasets[0].backgroundColor = pointColors(MAROON, n, diag);
                     scatterChart.data.datasets[1].data = linePoints;
+                    scatterChart.data.datasets[2].data = isMulti ? [] : trueCurve;
                     scatterChart.options.scales.x.title.text = xLabel;
                     scatterChart.options.scales.x.min = xAutoMin;
                     scatterChart.options.scales.x.max = xAutoMax;
@@ -1359,8 +1596,9 @@
                         type: 'scatter',
                         data: {
                             datasets: [
-                                { label: 'data', data: scatterPoints, backgroundColor: MAROON, pointRadius: 4, pointHoverRadius: 6 },
-                                { label: 'OLS', data: linePoints, type: 'line', borderColor: GOLD, borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0 }
+                                { label: 'data', data: scatterPoints, backgroundColor: pointColors(MAROON, n, diag), pointRadius: 4, pointHoverRadius: 6 },
+                                { label: 'OLS fit', data: linePoints, type: 'line', borderColor: GOLD, borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0 },
+                                { label: 'True relationship', data: isMulti ? [] : trueCurve, type: 'line', borderColor: TRUE_BLUE, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0.3 }
                             ]
                         },
                         options: {
@@ -1369,7 +1607,13 @@
                                 x: { title: { display: true, text: xLabel, font: { weight: '600', size: 11 } }, min: xAutoMin, max: xAutoMax },
                                 y: { title: { display: true, text: 'Y (outcome)', font: { weight: '600', size: 11 } } }
                             },
-                            plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                            plugins: {
+                                legend: {
+                                    display: true, position: 'bottom',
+                                    labels: { boxWidth: 18, font: { size: 10 }, filter: item => item.text !== 'data' && (showTrueLine || item.text !== 'True relationship') }
+                                },
+                                tooltip: { enabled: true }
+                            }
                         }
                     });
                 }
@@ -1380,6 +1624,7 @@
                 const zeroLine = [{ x: fMin - 1, y: 0 }, { x: fMax + 1, y: 0 }];
                 if (residChart) {
                     residChart.data.datasets[0].data = residPoints;
+                    residChart.data.datasets[0].backgroundColor = pointColors(GREEN, n, diag);
                     residChart.data.datasets[1].data = zeroLine;
                     residChart.update('none');
                 } else {
@@ -1387,7 +1632,7 @@
                         type: 'scatter',
                         data: {
                             datasets: [
-                                { label: 'residuals', data: residPoints, backgroundColor: GREEN, pointRadius: 4, pointHoverRadius: 6 },
+                                { label: 'residuals', data: residPoints, backgroundColor: pointColors(GREEN, n, diag), pointRadius: 4, pointHoverRadius: 6 },
                                 { label: 'zero', data: zeroLine, type: 'line', borderColor: '#94a3b8', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0 }
                             ]
                         },
@@ -1467,11 +1712,9 @@
             // ── Event listeners ──
             Object.values(sliderMap).forEach(s => s.el.addEventListener('input', updateCharts));
 
-            seedLockBtn.addEventListener('click', () => {
-                seedLocked = !seedLocked;
-                if (!seedLocked) lockedSeed = null;
-                seedLockBtn.textContent = seedLocked ? '🔒 Seed locked' : '🔓 Seed unlocked';
-                seedLockBtn.classList.toggle('locked', seedLocked);
+            newSampleBtn.addEventListener('click', () => {
+                seed = Math.floor(Math.random() * 2147483647);
+                updateCharts();
             });
 
             document.querySelectorAll('.info-btn').forEach(btn => {
@@ -1502,10 +1745,6 @@
                 sliderMap.hetero.el.value = p.hetero;
                 sliderMap.quad.el.value = p.quad;
                 sliderMap.auto.el.value = p.auto;
-                seedLocked = false;
-                lockedSeed = null;
-                seedLockBtn.textContent = '🔓 Seed unlocked';
-                seedLockBtn.classList.remove('locked');
                 document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
                 document.querySelector(`[data-preset="${name}"]`)?.classList.add('active');
                 updateCharts();
